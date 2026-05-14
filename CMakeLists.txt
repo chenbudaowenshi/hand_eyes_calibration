@@ -51,6 +51,7 @@ add_library(common STATIC
         src/calibration/04_hand_eye_3d_ball/BallCalibrator.cpp
         src/calibration/05_hand_eye_3d_board_img/BoardImageCalibrator.cpp
         src/calibration/06_hand_eye_3d_board_cloud/BoardCloudCalibrator.cpp
+        src/calibration/07_hand_eye_3d_multi_point/MultiPoint3DCalibrator.cpp
         src/calibration/hand_eye_3d_base/RobotCameraCalibrator3D.cpp
 )
 
