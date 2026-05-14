@@ -4,6 +4,7 @@
 #include "calibration/04_hand_eye_3d_ball/BallCalibrator.h"
 #include "calibration/05_hand_eye_3d_board_img/BoardImageCalibrator.h"
 #include "calibration/06_hand_eye_3d_board_cloud/BoardCloudCalibrator.h"
+#include "calibration/07_hand_eye_3d_multi_point/MultiPoint3DCalibrator.h"
 #include "calibration/hand_eye_3d_base/RobotCameraCalibrator3D.h"
 #include "common/CoordinateTransformer.h"
 #include <fstream>
@@ -16,6 +17,7 @@
 #define RUN_HAND_EYE_3D_BALL 1
 #define RUN_HAND_EYE_3D_BOARD_IMG 1
 #define RUN_HAND_EYE_3D_BOARD_CLOUD 0
+#define RUN_MULTI_POINT_3D 1
 
 struct Logger {
   static void info(const std::string &msg) {
@@ -420,6 +422,91 @@ int main() {
     Logger::warn("3D Ball-based Calibration failed.");
   }
 #endif
+
+#if RUN_MULTI_POINT_3D
+  /** 多点 3D 仿射：机器人位姿仅用到 (x,y,z) + 相机系标定球心 (x,y,z) */
+  const std::vector<std::vector<double>> robot_pose = {
+      {-621.59, 1305.31, 1285.92},
+      {-413.87, 1497.00, 1046.40},
+      {-169.71, 1531.33, 1128.30},
+      {-340.03, 1630.08, 1071.06},
+      {-602.10, 1768.01, 922.36},
+      {-248.67, 1830.81, 979.31},
+  };
+
+  const std::vector<std::vector<double>> marker_xyz = {
+    {-243.55, -199.25, 561.592},
+    {-49.562, 102.437, 645.957},
+    {210.057, 58.6,   728.596},
+    {7.5,    151.933, 778.472},
+    {-268.88, 336.168, 811.641},
+    {87.0192, 331.325, 923.076}
+  };
+
+  Logger::section(
+      "Category 6: 3D xyz–xyz Affine Fit ");
+
+  if (robot_pose.size() != marker_xyz.size() ||
+      robot_pose.size() < 4) {
+    Logger::error("3D xyz–xyz demo data: need ≥4 matching pairs.");
+    return -1;
+  }
+
+  std::vector<cv::Point3d> marker_pts_3d;
+  std::vector<cv::Point3d> robot_pts_3d;
+  marker_pts_3d.reserve(robot_pose.size());
+  robot_pts_3d.reserve(robot_pose.size());
+  for (size_t i = 0; i < robot_pose.size(); ++i) {
+    const auto &r = robot_pose[i];
+    const auto &m = marker_xyz[i];
+    robot_pts_3d.emplace_back(r[0], r[1], r[2]);
+    marker_pts_3d.emplace_back(m[0], m[1], m[2]);
+  }
+
+  MultiPoint3DCalibrator mp3d;
+  cv::Mat hand_eyes_3d_4p;
+  if (!mp3d.calibrate(marker_pts_3d, robot_pts_3d, hand_eyes_3d_4p)) {
+    Logger::error("3D xyz–xyz affine calibration failed!");
+    return -1;
+  }
+
+  std::cout << "[INFO] 3×4 affine M (robot ≈ M * [marker;1]):\n"
+            << hand_eyes_3d_4p << "\n"
+            << std::endl;
+
+  std::cout << "[INFO] Index | Robot(x,y,z) | Marker(x,y,z) | Pred(x,y,z) | "
+               "|Δ||\n";
+  std::cout << "------------------------------------------------------------"
+               "------------------\n";
+  const auto &perr = mp3d.getPerPointErrors();
+  for (size_t i = 0; i < robot_pts_3d.size(); ++i) {
+    cv::Point3d pr = mp3d.transform(marker_pts_3d[i], hand_eyes_3d_4p);
+    std::cout << std::setw(3) << i << " | " << std::setw(10) << robot_pts_3d[i].x
+              << ", " << std::setw(10) << robot_pts_3d[i].y << ", "
+              << std::setw(10) << robot_pts_3d[i].z << " | " << std::setw(10)
+              << marker_pts_3d[i].x << ", " << std::setw(10)
+              << marker_pts_3d[i].y << ", " << std::setw(10)
+              << marker_pts_3d[i].z << " | " << std::setw(10) << pr.x << ", "
+              << std::setw(10) << pr.y << ", " << std::setw(10) << pr.z
+              << " | ";
+    if (i < perr.size())
+      std::cout << std::setw(10) << perr[i];
+    else
+      std::cout << std::setw(10) << "N/A";
+    std::cout << "\n";
+  }
+
+  Logger::success("3D xyz–xyz affine fit RMSE: " +
+                  std::to_string(mp3d.getRmse()));
+
+  cv::Point3d test_mk = marker_pts_3d.front();
+  cv::Point3d test_rb = mp3d.transform(test_mk, hand_eyes_3d_4p);
+  std::cout << "\033[1;32m[VERIFY] 3D affine: Marker(" << test_mk.x << ","
+            << test_mk.y << "," << test_mk.z << ") → Robot(" << test_rb.x
+            << "," << test_rb.y << "," << test_rb.z << ")\033[0m\n"
+            << std::endl;
+#endif
+
 
 #if RUN_HAND_EYE_3D_BOARD_CLOUD
   Logger::section("Category 6: 3D Camera Hand-Eye Calibration - Based on Board "
