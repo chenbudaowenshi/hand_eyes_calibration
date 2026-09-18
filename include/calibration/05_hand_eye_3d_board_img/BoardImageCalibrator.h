@@ -70,6 +70,29 @@ public:
   std::vector<bool> getMarkerSuccess() const { return marker_success_; }
 
   /**
+   * @brief 获取标定板/标记点在固定坐标系下的位置
+   * EIH: 固定坐标系为机器人基座系; ETH: 固定坐标系为末端法兰系.
+   */
+  Vector3D getFixedPoint() const { return fixed_point_; }
+
+  /**
+   * @brief 获取二次标定 (基于全部有效图像) 得到的内参与畸变
+   */
+  void getRefinedIntrinsics(cv::Mat &K, cv::Mat &dist) const {
+    K = refined_K_;
+    dist = refined_dist_;
+  }
+
+  /**
+   * @brief 用另一种独立的经典算法 (TSAI) 交叉核验主结果 (PARK) 的平移量,
+   * 两者相差越大, 说明样本本身信息量不足以稳定确定解, 不是某一种算法的实现
+   * 问题. 单位 mm.
+   */
+  double getCrossCheckTranslationDiscrepancyMm() const {
+    return cross_check_discrepancy_mm_;
+  }
+
+  /**
    * @brief 设置欧拉角类型
    */
   void setRPYType(RPY::RPYType type,
@@ -87,6 +110,10 @@ protected:
   std::vector<double> errors_;
   std::vector<Vector3D> marker_points_; // 存储每个位姿对应的标记点
   std::vector<bool> marker_success_;    // 存储每个位姿是否检测成功
+  Vector3D fixed_point_;                // 标记点在固定坐标系下的位置
+  cv::Mat refined_K_;                   // 二次标定内参
+  cv::Mat refined_dist_;                // 二次标定畸变
+  double cross_check_discrepancy_mm_ = -1; // PARK 与 TSAI 平移量之差
 
   RPY::RPYType rpy_type_ = RPY::RPYType::XYZ;
   RPY::ReferenceType ref_type_ = RPY::ReferenceType::EXTRINSIC;

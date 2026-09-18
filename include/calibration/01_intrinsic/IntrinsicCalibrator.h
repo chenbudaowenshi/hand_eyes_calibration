@@ -23,6 +23,11 @@ struct CalibConfig {
   std::string xml_intrinsic_2nd =
       "calib_intrinsic_2nd.xml";                     // 第二相机内参文件名
   std::string xml_extrinsic = "calib_extrinsic.xml"; // 外参文件名
+  // When true, use the live RealSense K/distortion saved by capture instead
+  // of fitting a second camera model from the hand-eye images.
+  bool use_fixed_intrinsics = false;
+  cv::Mat fixed_K;
+  cv::Mat fixed_dist;
 };
 
 class IntrinsicCalibrator {

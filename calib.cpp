@@ -7,17 +7,225 @@
 #include "calibration/07_hand_eye_3d_multi_point/MultiPoint3DCalibrator.h"
 #include "calibration/hand_eye_3d_base/RobotCameraCalibrator3D.h"
 #include "common/CoordinateTransformer.h"
+#include <algorithm>
+#include <cmath>
+#include <dirent.h>
 #include <fstream>
 #include <iomanip>
+#include <opencv2/core/utils/filesystem.hpp>
+#include <sstream>
+#include <stdexcept>
 #include <vector>
 
 #define RUN_INTRINSIC 1
-#define RUN_FOUR_POINT_2D 1
-#define RUN_TWELVE_POINT_2D 1
-#define RUN_HAND_EYE_3D_BALL 1
+#define RUN_FOUR_POINT_2D 0
+#define RUN_TWELVE_POINT_2D 0
+#define RUN_HAND_EYE_3D_BALL 0
 #define RUN_HAND_EYE_3D_BOARD_IMG 1
 #define RUN_HAND_EYE_3D_BOARD_CLOUD 0
-#define RUN_MULTI_POINT_3D 1
+#define RUN_MULTI_POINT_3D 0
+
+static std::vector<std::string> list_images(const std::string &directory) {
+  std::vector<std::string> result;
+  const char *extensions[] = {"*.png", "*.jpg", "*.jpeg", "*.bmp"};
+  for (const char *extension : extensions) {
+    std::vector<std::string> matches;
+    cv::glob(directory + "/" + extension, matches, false);
+    result.insert(result.end(), matches.begin(), matches.end());
+  }
+  std::sort(result.begin(), result.end());
+  result.erase(std::unique(result.begin(), result.end()), result.end());
+  return result;
+}
+
+// poses.csv format (one row per image, in the same sorted order as rgb/):
+// image_name,capture_stamp_s,x_mm,y_mm,z_mm,rx_deg,ry_deg,rz_deg
+// x/y/z are T_<base-frame>_head_pitch_Link translation (mm) -- base-frame
+// is whatever `capture --base-frame ...` was pointed at (default
+// waist_yaw_Link; must be physically fixed relative to the calibration
+// board for the whole capture session); rx/ry/rz are its roll/pitch/yaw
+// (deg, extrinsic X-Y-Z / ROS "fixed axis" convention), as produced by the
+// `capture` tool from ROS2 TF.
+struct RobotPoseRecord {
+  std::string image_name;
+  double stamp_s = 0.0;
+  Pose3D pose;
+};
+
+static std::vector<RobotPoseRecord> load_robot_poses(const std::string &path) {
+  std::ifstream input(path);
+  if (!input.is_open())
+    throw std::runtime_error("cannot open robot pose CSV: " + path);
+
+  std::vector<RobotPoseRecord> records;
+  std::string line;
+  while (std::getline(input, line)) {
+    if (line.empty() || line[0] == '#')
+      continue;
+    std::replace(line.begin(), line.end(), ',', ' ');
+    std::istringstream row(line);
+    std::string image_name;
+    double stamp = 0.0;
+    double x = 0.0, y = 0.0, z = 0.0;
+    double rx = 0.0, ry = 0.0, rz = 0.0;
+    if (!(row >> image_name >> stamp >> x >> y >> z >> rx >> ry >> rz))
+      continue;  // allow a header row
+    RobotPoseRecord record;
+    record.image_name = image_name;
+    record.stamp_s = stamp;
+    record.pose = Pose3D(x, y, z, rx, ry, rz);
+    records.push_back(record);
+  }
+  return records;
+}
+
+// Returns the filename component of a path, tolerant of '/' and '\\'.
+static std::string basename_of(const std::string &path) {
+  size_t pos = path.find_last_of("/\\");
+  return pos == std::string::npos ? path : path.substr(pos + 1);
+}
+
+struct ErrorStats {
+  double rms = 0.0;
+  double avg = 0.0;
+  double max = 0.0;
+  size_t count = 0;
+};
+
+// Standardized RMS/avg/max over the non-negative entries of a per-point
+// error vector (negative entries mark "not detected" and are excluded).
+static ErrorStats compute_error_stats(const std::vector<double> &errors) {
+  ErrorStats stats;
+  double sum = 0.0, sum_sq = 0.0;
+  for (double e : errors) {
+    if (e < 0)
+      continue;
+    sum += e;
+    sum_sq += e * e;
+    stats.max = std::max(stats.max, e);
+    stats.count++;
+  }
+  if (stats.count > 0) {
+    stats.avg = sum / stats.count;
+    stats.rms = std::sqrt(sum_sq / stats.count);
+  }
+  return stats;
+}
+
+static double compute_intrinsic_rms(const std::vector<std::string> &images,
+                                    const CalibConfig &cfg,
+                                    const cv::Mat &K,
+                                    const cv::Mat &dist) {
+  double sum_squared = 0.0;
+  size_t count = 0;
+  for (const auto &path : images) {
+    cv::Mat image = cv::imread(path);
+    if (image.empty())
+      continue;
+    cv::Mat corners_vis;
+    std::vector<cv::Point2f> image_points;
+    std::vector<cv::Point3f> object_points;
+    if (IntrinsicCalibrator::detectCalibBoard(
+            image, corners_vis, image_points, object_points, cfg, 1) != 1)
+      continue;
+    cv::Mat rvec, tvec;
+    if (!cv::solvePnP(object_points, image_points, K, dist, rvec, tvec))
+      continue;
+    std::vector<cv::Point2f> projected;
+    cv::projectPoints(object_points, rvec, tvec, K, dist, projected);
+    for (size_t i = 0; i < image_points.size() && i < projected.size(); ++i) {
+      const cv::Point2f delta = image_points[i] - projected[i];
+      sum_squared += static_cast<double>(delta.dot(delta));
+      ++count;
+    }
+  }
+  return count == 0 ? -1.0 : std::sqrt(sum_squared / count);
+}
+
+// Re-runs board detection + PnP on a held-out sample (not part of the
+// hand-eye solve) and maps the resulting marker position through the
+// candidate hand-eye matrix (T_head_pitch_Link_camera_optical) and that
+// sample's own robot pose (T_<base-frame>_head_pitch_Link) into the base
+// frame, where it is compared against the fixed board position the
+// solver estimated from the training samples. This is an honest
+// out-of-sample check: nothing about this image or pose influenced the
+// solved transform. EIH-only, matching this pipeline's calibration type.
+struct ValidationResult {
+  bool board_found = false;
+  Vector3D predicted_point_base_frame;
+  double error_mm = -1.0;
+};
+
+static ValidationResult
+validate_held_out_sample(const std::string &image_path, Pose3D robot_pose,
+                         const CalibConfig &cfg, const cv::Mat &K_first,
+                         const cv::Mat &dist_first, const cv::Mat &K_second,
+                         const cv::Mat &dist_second, Pose3D hand_eye_pose,
+                         const Vector3D &fixed_point_base_frame) {
+  ValidationResult result;
+  cv::Mat raw = cv::imread(image_path);
+  if (raw.empty())
+    return result;
+
+  cv::Mat undistorted;
+  cv::undistort(raw, undistorted, K_first, dist_first);
+
+  cv::Mat corners_vis;
+  std::vector<cv::Point2f> pixel_corners;
+  std::vector<cv::Point3f> world_corners;
+  int ret = IntrinsicCalibrator::detectCalibBoard(
+      undistorted, corners_vis, pixel_corners, world_corners, cfg, 1);
+  if (ret != 1)
+    return result;
+
+  cv::Mat rvec, tvec;
+  cv::solvePnP(world_corners, pixel_corners, K_second, dist_second, rvec,
+              tvec);
+  Eigen::Vector3d p_camera_optical(tvec.at<double>(0), tvec.at<double>(1),
+                                   tvec.at<double>(2));
+
+  Eigen::Matrix4d T_head_pitch_camera = hand_eye_pose.toTransform3D().eigen();
+  Eigen::Vector3d p_head_pitch =
+      T_head_pitch_camera.block<3, 3>(0, 0) * p_camera_optical +
+      T_head_pitch_camera.block<3, 1>(0, 3);
+
+  Eigen::Matrix4d T_base_head_pitch = robot_pose.toTransform3D().eigen();
+  Eigen::Vector3d p_base = T_base_head_pitch.block<3, 3>(0, 0) * p_head_pitch +
+                          T_base_head_pitch.block<3, 1>(0, 3);
+
+  result.board_found = true;
+  result.predicted_point_base_frame = Vector3D(p_base);
+  result.error_mm = (p_base - fixed_point_base_frame.eigen()).norm();
+  return result;
+}
+
+static void write_urdf_snippet(const std::string &path,
+                               const Pose3D &pose_mm,
+                               const std::string &parent,
+                               const std::string &child,
+                               const std::string &child_axis_note =
+                                   "child optical frame (OpenCV/REP-103 "
+                                   "convention: X right, Y down, Z forward "
+                                   "out of the lens)") {
+  constexpr double kPi = 3.14159265358979323846;
+  std::ofstream output(path);
+  if (!output.is_open())
+    throw std::runtime_error("cannot write URDF snippet: " + path);
+  output << "<!-- T_" << parent << "_" << child << ": maps a point expressed\n"
+         << "     in the " << child_axis_note << " into the\n"
+         << "     parent link frame. rpy is extrinsic (fixed-axis) X-Y-Z,\n"
+         << "     matching URDF/ROS <origin rpy=\"...\"/> semantics. -->\n"
+         << "<joint name=\"" << child << "_joint\" type=\"fixed\">\n"
+         << "  <parent link=\"" << parent << "\"/>\n"
+         << "  <child link=\"" << child << "\"/>\n"
+         << std::fixed << std::setprecision(9)
+         << "  <origin xyz=\"" << pose_mm.x() / 1000.0 << " "
+         << pose_mm.y() / 1000.0 << " " << pose_mm.z() / 1000.0
+         << "\" rpy=\"" << pose_mm.rx() * kPi / 180.0 << " "
+         << pose_mm.ry() * kPi / 180.0 << " "
+         << pose_mm.rz() * kPi / 180.0 << "\"/>\n"
+         << "</joint>\n";
+}
 
 struct Logger {
   static void info(const std::string &msg) {
@@ -47,7 +255,56 @@ struct Logger {
   }
 };
 
-int main() {
+int main(int argc, char **argv) {
+  std::string dataset_dir = "../dataset";
+  std::string output_dir = "../calibration_output";
+  std::string child_frame = "head_d435i_optical_frame";
+  std::string fixed_intrinsics_path;
+  int validate_count = 1;
+  for (int i = 1; i < argc; ++i) {
+    std::string argument(argv[i]);
+    if (argument == "--dataset" && i + 1 < argc)
+      dataset_dir = argv[++i];
+    else if (argument == "--output" && i + 1 < argc)
+      output_dir = argv[++i];
+    else if (argument == "--child-frame" && i + 1 < argc)
+      child_frame = argv[++i];
+    else if (argument == "--validate-count" && i + 1 < argc)
+      validate_count = std::atoi(argv[++i]);
+    else if (argument == "--fixed-intrinsics" && i + 1 < argc)
+      fixed_intrinsics_path = argv[++i];
+    else if (argument == "--help") {
+      std::cout
+          << "Usage: calib --dataset DATASET_DIR --output OUTPUT_DIR "
+             "[--validate-count N] [--child-frame NAME] "
+             "[--fixed-intrinsics PATH]\n"
+          << "DATASET_DIR/rgb contains chessboard images and\n"
+          << "DATASET_DIR/poses.csv contains "
+             "image,stamp,x_mm,y_mm,z_mm,rx_deg,ry_deg,rz_deg.\n"
+          << "The last N samples (default 1) are held out of both intrinsic\n"
+          << "refinement and the hand-eye solve, then used to independently\n"
+          << "validate the resulting matrix.\n"
+          << "--fixed-intrinsics PATH: use a realsense_intrinsics.xml-style\n"
+          << "K/distortion instead of re-fitting from these images. Prefer\n"
+          << "this whenever the dataset is camera-moves/board-fixed (the\n"
+          << "board stays close to fronto-parallel across all frames) --\n"
+          << "that geometry is poorly conditioned for cv::calibrateCamera\n"
+          << "and can silently produce a garbage fit (asymmetric fx/fy,\n"
+          << "huge distortion) even when its own reported RMS looks small.\n";
+      return 0;
+    } else {
+      std::cerr << "Unknown or incomplete argument: " << argument << "\n";
+      return 2;
+    }
+  }
+  if (validate_count < 0) {
+    std::cerr << "--validate-count must be >= 0\n";
+    return 2;
+  }
+  if (cv::utils::fs::createDirectories(output_dir) != true) {
+    std::cerr << "Cannot create output directory: " << output_dir << "\n";
+    return 2;
+  }
   std::cout << std::fixed << std::setprecision(4);
   Logger::section("Industrial Camera + Robot Hand-Eye Calibration Program");
   std::cout << "Included: 2.5D Hand-Eye | 2D Four-Point | 2D Twelve-Point High "
@@ -57,65 +314,101 @@ int main() {
 #if RUN_INTRINSIC
   CalibConfig cfg;
 
-  // --- Preset 1: Asymmetric Circles (Recommended: 4x11) ---
-  // cfg.pattern = CIRCLES_ASYM;
-  // cfg.cols = 4;
-  // cfg.rows = 11;
-  // cfg.interval_mm = 25; // Standard A4 print spacing
-
-  // --- Preset 2: Chessboard (Standard: 7x6) ---
-  // cfg.pattern = CHESSBOARD;
-  // cfg.cols = 7;
-  // cfg.rows = 6;
-  // cfg.interval_mm = 25; // Standard A4 print spacing
-
-  // --- Current Active Config (Default) ---
-  cfg.pattern = CIRCLES_ASYM;
-  cfg.calib_type = CalibrationType3D::ETH;
-  cfg.cols = 4;
-  cfg.rows = 5;
-  cfg.interval_mm = 20;         // 标定板圆心间距
+  // Physical board: 12x9 squares (12 across, 9 down), 15 mm per square.
+  // OpenCV receives the number of *inner* corners, hence 11x8.
+  cfg.pattern = CHESSBOARD;
+  cfg.calib_type = CalibrationType3D::EIH; // head camera: camera moves with
+                                            // head_pitch_Link, board is
+                                            // fixed relative to whatever
+                                            // --base-frame `capture` used.
+  cfg.cols = 11;
+  cfg.rows = 8;
+  cfg.interval_mm = 15;         // square size in millimetres
   cfg.marker_length_mm = 50.0f; // 标定板marker长度
+  cfg.xml_intrinsic_1st = output_dir + "/calib_intrinsic_1st.xml";
+  cfg.xml_intrinsic_2nd = output_dir + "/calib_intrinsic_2nd.xml";
+  cfg.xml_extrinsic = output_dir + "/calib_extrinsic.xml";
 
-  std::vector<std::string> intrinsic_img_files = {
-      "../assert/camera/10.png", "../assert/camera/11.png",
-      "../assert/camera/12.png", "../assert/camera/13.png",
-      "../assert/camera/14.png", "../assert/camera/15.png",
-      "../assert/camera/16.png", "../assert/camera/17.png",
-      "../assert/camera/18.png", "../assert/camera/19.png",
-      "../assert/camera/20.png", "../assert/camera/21.png",
-      "../assert/camera/22.png", "../assert/camera/23.png",
-      "../assert/camera/24.png", "../assert/camera/25.png",
-      "../assert/camera/26.png", "../assert/camera/27.png",
-      "../assert/camera/28.png", "../assert/camera/29.png"};
-  std::vector<std::string> extrinsic_img_files = intrinsic_img_files;
-  const std::vector<Pose3D> robot_poses = {
-      {211.892, -415.103, -536.213, -91.135, 44.296, 11.726},
-      {217.353, -412.223, -530.437, -89.057, 44.896, 13.651},
-      {235.681, -408.397, -527.87, -87.607, 45.096, 15.771},
-      {235.678, -411.597, -527.868, -84.762, 46.641, 21.056},
-      {252.301, -427.281, -524.428, -82.312, 47.657, 23.928},
-      {251.664, -412.156, -518.114, -80.204, 48.466, 27.648},
-      {250.344, -422.522, -520.923, -78.108, 49.324, 32.218},
-      {252.918, -401.931, -541.12, -83.448, 46.17, 23.515},
-      {251.206, -386.262, -542.755, -85.8, 45.12, 20.078},
-      {223.281, -378.458, -542.76, -88.365, 44.261, 16.83},
-      {219.702, -418.79, -536.205, -89.737, 50.569, 12.734},
-      {217.392, -412.203, -530.434, -91.857, 39.008, 18.558},
-      {235.686, -408.395, -527.868, -79.344, 39.103, 18.983},
-      {235.683, -411.597, -535.154, -79.481, 39.239, 23.953},
-      {245.722, -414.54, -523.743, -84.142, 50.207, 28.574},
-      {256.122, -412.152, -526.174, -79.561, 44.677, 33.859},
-      {238.346, -422.975, -530.894, -84.73, 48.306, 25.753},
-      {252.926, -401.932, -536.669, -83.512, 38.762, 28.218},
-      {251.213, -386.262, -542.757, -82.352, 48.152, 39.276},
-      {229.352, -374.528, -536.877, -86.592, 38.116, 17.081}};
+  if (!fixed_intrinsics_path.empty()) {
+    cv::FileStorage fs_fixed(fixed_intrinsics_path, cv::FileStorage::READ);
+    if (!fs_fixed.isOpened()) {
+      std::cerr << "Cannot open --fixed-intrinsics file: "
+                << fixed_intrinsics_path << "\n";
+      return 2;
+    }
+    fs_fixed["K"] >> cfg.fixed_K;
+    fs_fixed["distortion"] >> cfg.fixed_dist;
+    fs_fixed.release();
+    if (cfg.fixed_K.empty()) {
+      std::cerr << "--fixed-intrinsics file has no K matrix: "
+                << fixed_intrinsics_path << "\n";
+      return 2;
+    }
+    cfg.use_fixed_intrinsics = true;
+    Logger::info("Using fixed intrinsics from " + fixed_intrinsics_path +
+                " (skipping cv::calibrateCamera refits).");
+  }
+
+  std::vector<std::string> all_images = list_images(dataset_dir + "/rgb");
+  if (all_images.empty())
+    all_images = list_images(dataset_dir);
+  std::vector<RobotPoseRecord> all_records;
+  try {
+    all_records = load_robot_poses(dataset_dir + "/poses.csv");
+  } catch (const std::exception &e) {
+    std::cerr << "Failed to load robot poses: " << e.what()
+              << "\nDid you run `capture --dataset " << dataset_dir
+              << " --base-frame ...` first?\n";
+    return 2;
+  }
+
+  if (all_images.size() != all_records.size()) {
+    std::cerr << "Need exactly one pose row per image; images="
+              << all_images.size() << " poses=" << all_records.size() << "\n";
+    return 2;
+  }
+  for (size_t i = 0; i < all_images.size(); ++i) {
+    if (basename_of(all_images[i]) != all_records[i].image_name) {
+      std::cerr << "poses.csv row " << i << " names '"
+                << all_records[i].image_name
+                << "' but the sorted image list has '"
+                << basename_of(all_images[i])
+                << "' at that position -- refusing to guess the pairing.\n";
+      return 2;
+    }
+  }
+  if (all_records.size() < static_cast<size_t>(5 + validate_count)) {
+    std::cerr << "Need at least 5 calibration samples plus "
+              << validate_count << " held-out validation sample(s); only "
+              << all_records.size() << " captured.\n";
+    return 2;
+  }
+
+  // The last `validate_count` captures never touch intrinsic refinement or
+  // the hand-eye solve -- they exist solely to check the solved matrix
+  // against poses/images it has never seen (requirement: independent
+  // validation).
+  size_t n_calib = all_records.size() - validate_count;
+  std::vector<std::string> calib_images(all_images.begin(),
+                                        all_images.begin() + n_calib);
+  std::vector<Pose3D> calib_poses;
+  for (size_t i = 0; i < n_calib; ++i)
+    calib_poses.push_back(all_records[i].pose);
+
+  std::vector<std::string> validation_images(all_images.begin() + n_calib,
+                                             all_images.end());
+  std::vector<RobotPoseRecord> validation_records(all_records.begin() +
+                                                       n_calib,
+                                                   all_records.end());
 
   Logger::section("Category 1: Intrinsic Calibration");
+  Logger::info("Using " + std::to_string(calib_images.size()) +
+              " images for calibration, " +
+              std::to_string(validation_images.size()) +
+              " held out for validation.");
 
   IntrinsicCalibrator calib_obj;
-  std::ifstream f_intrinsic(cfg.xml_intrinsic_1st);
-  if (!calib_obj.intrinsicCalibrate(cfg, intrinsic_img_files)) {
+  if (!calib_obj.intrinsicCalibrate(cfg, calib_images)) {
     Logger::error("Intrinsic calibration failed!");
     return -1;
   }
@@ -126,14 +419,16 @@ int main() {
   Logger::section(
       "Category 2: 3D Camera Hand-Eye Calibration - Based on Board Image");
 
-  std::ifstream f_extrinsic(cfg.xml_extrinsic);
   Logger::info("Starting hand-eye calibration...");
   BoardImageCalibrator board_calib_obj;
   board_calib_obj.setConfig(cfg);
-  board_calib_obj.setImageFiles(extrinsic_img_files);
-  board_calib_obj.setRobotPoses(robot_poses);
+  board_calib_obj.setImageFiles(calib_images);
+  board_calib_obj.setRobotPoses(calib_poses);
   board_calib_obj.setCalibrationType(cfg.calib_type);
-  // 设置欧拉角类型 (示例: XYZ 外旋)
+  // Robot poses come straight from a TF quaternion via
+  // tf2::Matrix3x3::getRPY(), which *is* extrinsic (fixed-axis) X-Y-Z --
+  // the one Euler convention this project's RPY::toRotation3D() actually
+  // implements, and the same convention URDF/ROS <origin rpy="..."/> uses.
   board_calib_obj.setRPYType(RPY::RPYType::XYZ, RPY::ReferenceType::EXTRINSIC);
 
   if (!board_calib_obj.runCalibration()) {
@@ -143,6 +438,49 @@ int main() {
   Logger::success("3D Hand-Eye Calibration success!");
   std::cout << "\n";
   Pose3D hand_eye_pose = board_calib_obj.getResultPose();
+
+  // hand_eye_pose comes from cv::calibrateHandEye() (PARK), which properly
+  // decouples rotation and translation instead of inverting one big coupled
+  // matrix -- it no longer explodes to meters of error on marginal data the
+  // way this project's original custom closed-form solver did. But a
+  // numerically well-behaved answer isn't automatically a *correct* one:
+  // when the robot's own rotation doesn't excite enough independent
+  // directions (e.g. a pan/tilt head with no roll, poses clustered near
+  // neutral), different, genuinely independent algorithms can still land
+  // on substantially different translations from the very same images.
+  // Two cheap tripwires, neither of which requires understanding the
+  // solver's internals:
+  constexpr double kMaxPlausibleOffsetMm = 300.0;
+  constexpr double kMaxCrossCheckDiscrepancyMm = 30.0;
+  {
+    // 1) A camera bolted directly to a robot link is never offset by more
+    // than ~30cm from that link's origin in any real design.
+    double offset_mm = hand_eye_pose.xyz().eigen().norm();
+    if (offset_mm > kMaxPlausibleOffsetMm) {
+      Logger::warn(
+          "hand_eye translation magnitude is " + std::to_string(offset_mm) +
+          "mm -- implausible for a camera mounted on this link. Do not "
+          "trust this result -- recapture with a wider, more varied "
+          "yaw/pitch sweep.");
+    }
+    // 2) PARK (used above) and TSAI solve rotation and translation via
+    // genuinely different math; on well-supported data they agree closely.
+    // A big gap here means the sample set doesn't carry enough information
+    // to pin down a unique answer, even though neither number individually
+    // looks obviously wrong.
+    double cross_check_mm = board_calib_obj.getCrossCheckTranslationDiscrepancyMm();
+    if (cross_check_mm >= 0 && cross_check_mm > kMaxCrossCheckDiscrepancyMm) {
+      Logger::warn(
+          "PARK vs. TSAI hand-eye translation disagree by " +
+          std::to_string(cross_check_mm) +
+          "mm on the same images. Neither individual answer may look "
+          "wrong, but this disagreement means the sample set doesn't "
+          "carry enough independent rotation information to determine a "
+          "unique, trustworthy result -- treat the result below with "
+          "suspicion and prefer recapturing with more varied poses over "
+          "trusting either number.");
+    }
+  }
   auto errors = board_calib_obj.getErrors();
   auto markers = board_calib_obj.getMarkerPoints();
   auto marker_success = board_calib_obj.getMarkerSuccess();
@@ -150,8 +488,8 @@ int main() {
   std::cout << "[INFO] Index | Robot(x,y,z,rx,ry,rz) | Marker(x,y,z) | Error\n";
   std::cout
       << "--------------------------------------------------------------\n";
-  for (size_t i = 0; i < robot_poses.size(); ++i) {
-    Pose3D p = robot_poses[i];
+  for (size_t i = 0; i < calib_poses.size(); ++i) {
+    Pose3D p = calib_poses[i];
     std::cout << std::setw(3) << i << " | " << std::setw(10) << p.x() << ", "
               << std::setw(10) << p.y() << ", " << std::setw(10) << p.z()
               << ", " << std::setw(10) << p.rx() << ", " << std::setw(10)
@@ -173,35 +511,16 @@ int main() {
     std::cout << "\n";
   }
 
-  double errorSum = 0.0;
-  int errCount = 0;
-  for (auto error : errors) {
-    if (error >= 0) {
-      errorSum += error;
-      errCount++;
-    }
-  }
-  double avg = errCount == 0 ? 0 : errorSum / errCount;
+  ErrorStats fit_stats = compute_error_stats(errors);
+  Logger::success("3D Hand-Eye Calibration successful! RMS: " +
+                  std::to_string(fit_stats.rms) +
+                  " mm, Avg: " + std::to_string(fit_stats.avg) +
+                  " mm, Max: " + std::to_string(fit_stats.max) + " mm (n=" +
+                  std::to_string(fit_stats.count) + ")");
 
-  double maxE = 0, minE = 0;
-  bool first = true;
-  for (auto error : errors) {
-    if (error < 0)
-      continue;
-    if (first) {
-      maxE = minE = error;
-      first = false;
-    } else {
-      maxE = std::max(maxE, error);
-      minE = std::min(minE, error);
-    }
-  }
-
-  Logger::success(
-      "3D Hand-Eye Calibration successful! Avg Error: " + std::to_string(avg) +
-      ", Max: " + std::to_string(maxE) + ", Min: " + std::to_string(minE));
-
-  std::cout << "[INFO] hand_eyes Homogeneous Matrix (Eigen format):\n"
+  std::cout << "[INFO] T_head_pitch_Link_camera_optical -- maps a point p_cam\n"
+               "       in the camera optical frame into head_pitch_Link via\n"
+               "       p_head_pitch_Link = R * p_cam + t (Eigen 4x4 form):\n"
             << hand_eye_pose.toTransform3D().eigen() << "\n"
             << std::endl;
 
@@ -209,6 +528,93 @@ int main() {
             << hand_eye_pose.x() << ", " << hand_eye_pose.y() << ", "
             << hand_eye_pose.z() << ", " << hand_eye_pose.rx() << ", "
             << hand_eye_pose.ry() << ", " << hand_eye_pose.rz() << std::endl;
+
+  // --- Held-out validation: samples in validation_images/validation_records
+  // never participated in intrinsic refinement or the hand-eye solve above.
+  cv::Mat K_first, dist_first;
+  {
+    cv::FileStorage fs_1st(cfg.xml_intrinsic_1st, cv::FileStorage::READ);
+    fs_1st["K"] >> K_first;
+    fs_1st["distortion"] >> dist_first;
+  }
+  cv::Mat K_second, dist_second;
+  board_calib_obj.getRefinedIntrinsics(K_second, dist_second);
+  Vector3D fixed_point_base = board_calib_obj.getFixedPoint();
+
+  std::vector<double> validation_errors;
+  if (!validation_images.empty()) {
+    Logger::section("Category 2b: Independent Pose Validation (held-out)");
+    std::cout
+        << "[INFO] Index | Image | Predicted(x,y,z in capture's --base-frame) "
+           "| Error\n";
+    std::cout
+        << "--------------------------------------------------------------\n";
+    for (size_t i = 0; i < validation_images.size(); ++i) {
+      ValidationResult v = validate_held_out_sample(
+          validation_images[i], validation_records[i].pose, cfg, K_first,
+          dist_first, K_second, dist_second, hand_eye_pose, fixed_point_base);
+      std::cout << std::setw(3) << i << " | "
+                << basename_of(validation_images[i]) << " | ";
+      if (v.board_found) {
+        std::cout << std::setw(10) << v.predicted_point_base_frame.x() << ", "
+                  << std::setw(10) << v.predicted_point_base_frame.y() << ", "
+                  << std::setw(10) << v.predicted_point_base_frame.z()
+                  << " | " << std::setw(10) << v.error_mm;
+        validation_errors.push_back(v.error_mm);
+      } else {
+        std::cout << std::setw(10) << "N/A" << ", " << std::setw(10) << "N/A"
+                  << ", " << std::setw(10) << "N/A" << " | " << std::setw(10)
+                  << "N/A";
+        validation_errors.push_back(-1.0);
+      }
+      std::cout << "\n";
+    }
+    ErrorStats val_stats = compute_error_stats(validation_errors);
+    if (val_stats.count > 0) {
+      Logger::success(
+          "Independent validation: RMS: " + std::to_string(val_stats.rms) +
+          " mm, Avg: " + std::to_string(val_stats.avg) +
+          " mm, Max: " + std::to_string(val_stats.max) + " mm (n=" +
+          std::to_string(val_stats.count) + ")");
+    } else {
+      Logger::warn("Independent validation: board not detected in any "
+                  "held-out sample.");
+    }
+  } else {
+    Logger::warn("--validate-count 0: no independent pose validation run.");
+  }
+
+  // The URDF models the camera mount as TWO joints:
+  //   head_pitch_Link --(head_d435i_joint, the one to calibrate)--> head_d435i_link
+  //   head_d435i_link --(head_d435i_optical_joint, FIXED, rpy="-1.5708 0 -1.5708")--> head_d435i_optical_frame
+  // solvePnP/OpenCV work in the optical convention, so hand_eye_pose above
+  // is T_head_pitch_Link_camera_optical -- correct for the *_optical_frame
+  // child, but NOT what belongs in head_d435i_joint (link convention). Pasting
+  // the optical-convention numbers into head_d435i_joint directly is exactly
+  // the mistake this section exists to prevent: same translation magnitude
+  // (both frames share an origin) but a rotated/wrong-axis result, easy to
+  // miss without a numeric check.
+  // R_link_from_optical: p_link_local = R_lo * p_optical_local (from the
+  // fixed joint's rpy="-1.5708 0 -1.5708", extrinsic X-Y-Z).
+  Eigen::Matrix3d R_link_from_optical;
+  R_link_from_optical << 0, 0, 1,
+                         -1, 0, 0,
+                          0, -1, 0;
+  Eigen::Matrix4d T_optical = hand_eye_pose.toTransform3D().eigen();
+  Eigen::Matrix4d T_link = Eigen::Matrix4d::Identity();
+  T_link.block<3, 3>(0, 0) =
+      T_optical.block<3, 3>(0, 0) * R_link_from_optical.transpose();
+  T_link.block<3, 1>(0, 3) = T_optical.block<3, 1>(0, 3); // shared origin
+  Pose3D hand_eye_pose_link = Pose3D(Transform3D(T_link));
+
+  std::cout << "[INFO] T_head_pitch_Link_" << child_frame
+            << "_LINK (paste into head_d435i_joint's <origin>, NOT the "
+               "*_optical block above):\n"
+            << "  xyz(mm) = " << hand_eye_pose_link.x() << ", "
+            << hand_eye_pose_link.y() << ", " << hand_eye_pose_link.z()
+            << "\n  rpy(deg) = " << hand_eye_pose_link.rx() << ", "
+            << hand_eye_pose_link.ry() << ", " << hand_eye_pose_link.rz()
+            << std::endl;
 
   cv::Mat H_hand_eyes =
       CoordinateTransformer::toHomogeneousMatrix(hand_eye_pose);
@@ -220,7 +626,38 @@ int main() {
 
   cv::FileStorage fs_hand_eye(cfg.xml_extrinsic, cv::FileStorage::WRITE);
   fs_hand_eye << "R" << H_cam_to_gripper_R << "t" << H_cam_to_gripper_t;
+  fs_hand_eye << "calibration_type" << "EIH"
+              << "translation_unit" << "mm"
+              << "matrix_semantics" << "T_head_pitch_Link_camera_optical"
+              << "matrix_convention"
+              << "p_head_pitch_Link = R * p_camera_optical + t"
+              << "link_convention_xyz_mm"
+              << (cv::Mat_<double>(1, 3) << hand_eye_pose_link.x(),
+                  hand_eye_pose_link.y(), hand_eye_pose_link.z())
+              << "link_convention_rpy_deg"
+              << (cv::Mat_<double>(1, 3) << hand_eye_pose_link.rx(),
+                  hand_eye_pose_link.ry(), hand_eye_pose_link.rz())
+              << "link_convention_note"
+              << "head_pitch_Link -> head_d435i_link (fixed joint), paste "
+                 "this xyz/rpy into head_d435i_joint's <origin>"
+              << "board_squares" << "[12, 9]"
+              << "square_size_mm" << 15 << "fit_rms_mm" << fit_stats.rms
+              << "fit_avg_mm" << fit_stats.avg << "fit_max_mm" << fit_stats.max
+              << "fit_sample_count" << (int)fit_stats.count;
+  if (!validation_errors.empty()) {
+    ErrorStats val_stats = compute_error_stats(validation_errors);
+    fs_hand_eye << "validation_rms_mm" << val_stats.rms << "validation_avg_mm"
+                << val_stats.avg << "validation_max_mm" << val_stats.max
+                << "validation_sample_count" << (int)val_stats.count;
+  }
   fs_hand_eye.release();
+  write_urdf_snippet(output_dir + "/head_d435i_optical.urdf.xml",
+                     hand_eye_pose, "head_pitch_Link", child_frame);
+  write_urdf_snippet(output_dir + "/head_d435i_link.urdf.xml",
+                     hand_eye_pose_link, "head_pitch_Link", "head_d435i_link",
+                     "child *link* frame (ROS REP-103 convention: X "
+                     "forward, Y left, Z up -- NOT the optical convention; "
+                     "paste this straight into head_d435i_joint)");
   Logger::success("3D Hand-Eye Calibration complete!");
 #endif
 

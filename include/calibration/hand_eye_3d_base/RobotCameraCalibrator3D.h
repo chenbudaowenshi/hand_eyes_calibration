@@ -12,6 +12,7 @@ class RobotCameraCalibrator3DImpl {
 private:
   std::vector<Eigen::Matrix<double, 3, 5>> Pose_Point;
   double errorValue = 0;
+  double closedFormConditionNumber = 0;
 
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -35,6 +36,10 @@ public:
   int calib_iterative();
 
   double calibrate();
+
+  double getClosedFormConditionNumber() const {
+    return closedFormConditionNumber;
+  }
 };
 
 class RobotCameraCalibrator3D {

@@ -86,8 +86,16 @@ Eigen::Matrix<double, 9, 1> RobotCameraCalibrator3DImpl::update() {
   J2 = Eigen::MatrixXd::Identity(3, 3).replicate(n, 1);
   J << J1, J2, J3;
 
-  Eigen::Matrix<double, 9, 1> x;
-  x = (J.transpose() * J).inverse() * J.transpose() * f;
+  // SVD-based solve instead of (J^T J).inverse() * J^T * f: the normal-
+  // equations form squares J's condition number, so on marginal/ill-
+  // conditioned data (few samples, or rotation not exciting all axes) the
+  // plain inverse amplifies noise into a huge, wrong-but-plausible-looking
+  // update instead of the bounded, minimum-norm least-squares correction
+  // an SVD solve gives. J has a compile-time-fixed column count (9), and
+  // Eigen's thin-SVD path requires a dynamic column count, so use full
+  // U/V here -- J is small (3n x 9) so the extra cost is negligible.
+  Eigen::Matrix<double, 9, 1> x =
+      J.jacobiSvd(Eigen::ComputeFullU | Eigen::ComputeFullV).solve(f);
 
   return x;
 }
@@ -111,7 +119,36 @@ int RobotCameraCalibrator3DImpl::calib_closedForm() {
     b.middleRows<3>(i * 3 - 3) << Pose_Point[i - 1].middleCols<1>(3);
   }
 
-  x = (K.transpose() * K).inverse() * K.transpose() * b;
+  // Same reasoning as update(): solve K directly via SVD instead of
+  // inverting the normal-equations matrix (K^T K), which squares K's
+  // condition number. A 2-DOF mechanism (e.g. a pan/tilt head with no
+  // roll) can only excite a subset of this system's 15 unknowns well no
+  // matter how the samples are spread out -- when that happens, a plain
+  // inverse blows the near-singular directions up into a wrong answer
+  // that still "looks like" a solution (no error, no NaN); SVD gracefully
+  // returns the minimum-norm least-squares solution instead. K has a
+  // compile-time-fixed column count (15), and Eigen's thin-SVD path
+  // requires a dynamic column count, so use full U/V here -- K is small
+  // (3n x 15) so the extra cost is negligible.
+  Eigen::BDCSVD<Eigen::MatrixXd> solve_svd(
+      K, Eigen::ComputeFullU | Eigen::ComputeFullV);
+  x = solve_svd.solve(b);
+  {
+    const auto &sv = solve_svd.singularValues();
+    double cond = sv(0) / sv(sv.size() - 1);
+    closedFormConditionNumber = cond;
+    if (cond > 1e4) {
+      std::cerr << "\033[1;33m[WARN] Hand-eye linear system is poorly "
+                   "conditioned (condition number "
+                << cond
+                << "). The samples likely don't excite enough independent "
+                   "rotation directions (e.g. a pan/tilt mechanism with no "
+                   "roll, or poses clustered too close together) -- the "
+                   "result below is the minimum-norm least-squares answer, "
+                   "not a well-determined one. Treat it with suspicion.\033[0m"
+                << std::endl;
+    }
+  }
 
   Eigen::Matrix<double, 3, 3> temp_x;
   temp_x = Eigen::Map<Eigen::Matrix<double, 3, 3>, Eigen::RowMajor>(
@@ -157,6 +194,15 @@ double RobotCameraCalibrator3DImpl::calibrate() {
   calib_closedForm();
   Eigen::Vector3d error;
   double rmse = 0.0;
+  // Always refine, even when calib_closedForm() flagged a high condition
+  // number: that number measures worst-case noise sensitivity of the
+  // *linear* closed-form system, not whether Gauss-Newton refinement will
+  // help. In practice it does help on real, merely-imperfect datasets
+  // (skipping it here regressed a known-good 30-pose run's fit from
+  // ~25mm RMS to >1000mm) -- the condition-number warning stays purely
+  // informational; getCalibrationError()'s per-point residuals and
+  // calib.cpp's plausibility check on the final translation are what
+  // actually catch a bad answer.
   calib_iterative();
   for (int i = 1; i <= Pose_Point.size(); i++) {
     error = -Eye2Fixed.leftCols<3>() * Pose_Point[i - 1].rightCols<1>() -

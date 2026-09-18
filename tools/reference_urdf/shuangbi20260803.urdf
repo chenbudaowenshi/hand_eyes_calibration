@@ -1,0 +1,1313 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- This URDF was automatically created by SolidWorks to URDF Exporter! Originally created by Stephen Brawner (brawner@gmail.com) 
+     Commit Version: 1.6.0-4-g7f85cfe  Build Version: 1.6.7995.38578
+     For more information, please see http://wiki.ros.org/sw_urdf_exporter -->
+<robot
+  name="shuangbi20260803">
+  <link
+    name="base_link">
+    <inertial>
+      <origin
+        xyz="-0.063750495689574 -1.14207682388094E-05 -0.0225828294900094"
+        rpy="0 0 0" />
+      <mass
+        value="63.6204774456378" />
+      <inertia
+        ixx="1.13184889985291"
+        ixy="-0.000130529642087767"
+        ixz="-0.00139890209647156"
+        iyy="0.809278387934913"
+        iyz="-7.49695674947384E-06"
+        izz="1.57710917397769" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/base_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/base_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <link
+    name="left_wheel_Link">
+    <inertial>
+      <origin
+        xyz="-2.15461514824428E-09 0.0347252006999326 3.00735251733408E-06"
+        rpy="0 0 0" />
+      <mass
+        value="1.31114385262358" />
+      <inertia
+        ixx="0.00252108307391881"
+        ixy="1.42017334070605E-13"
+        ixz="5.09018249109811E-10"
+        iyy="0.00419183877067012"
+        iyz="2.30135661051173E-07"
+        izz="0.00252107344601099" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/left_wheel_Link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/left_wheel_Link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="left_wheel_joint"
+    type="continuous">
+    <origin
+      xyz="0.000249999999999985 0.141 -0.3207"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="left_wheel_Link" />
+    <axis
+      xyz="0 1 0" />
+  </joint>
+  <link
+    name="right_wheel_Link">
+    <inertial>
+      <origin
+        xyz="2.15461517415671E-09 -0.0347252006999325 3.00735251736184E-06"
+        rpy="0 0 0" />
+      <mass
+        value="1.31114385262358" />
+      <inertia
+        ixx="0.00252108307391881"
+        ixy="1.42017599909228E-13"
+        ixz="-5.09018249106074E-10"
+        iyy="0.00419183877067012"
+        iyz="-2.30135661050968E-07"
+        izz="0.00252107344601099" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/right_wheel_Link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/right_wheel_Link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="right_wheel_joint"
+    type="continuous">
+    <origin
+      xyz="0.000249999999999985 -0.141 -0.3207"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="right_wheel_Link" />
+    <axis
+      xyz="0 1 0" />
+  </joint>
+  <link
+    name="up_down1_Link">
+    <inertial>
+      <origin
+        xyz="0.000465738507389762 0.00101597852917125 -0.200056034779914"
+        rpy="0 0 0" />
+      <mass
+        value="5.60418398522831" />
+      <inertia
+        ixx="0.067486017484688"
+        ixy="-3.07570102169896E-15"
+        ixz="-2.99433949376248E-13"
+        iyy="0.0674860174371096"
+        iyz="3.07734672386253E-13"
+        izz="0.0145382434731011" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/up_down1_Link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/up_down1_Link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="up_down1_joint"
+    type="prismatic">
+    <origin
+      xyz="0.159534261745105 -0.00101597853951247 0.3615"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="up_down1_Link" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="0"
+      upper="0.2"
+      effort="0"
+      velocity="0" />
+  </joint>
+  <link
+    name="up_down2_Link">
+    <inertial>
+      <origin
+        xyz="0.000448139439265027 0.000463257402368971 -0.11391117235644"
+        rpy="0 0 0" />
+      <mass
+        value="5.61806128090535" />
+      <inertia
+        ixx="0.0528482254757931"
+        ixy="2.36745229648921E-06"
+        ixz="1.58748389798411E-06"
+        iyy="0.0532051004105586"
+        iyz="2.66018944407314E-05"
+        izz="0.0109433528906197" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/up_down2_Link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/up_down2_Link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="up_down2_joint"
+    type="prismatic">
+    <origin
+      xyz="0 0 -0.011"
+      rpy="0 0 0" />
+    <parent
+      link="up_down1_Link" />
+    <child
+      link="up_down2_Link" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="0"
+      upper="0.2"
+      effort="0"
+      velocity="0" />
+  </joint>
+  <link
+    name="waist_pitch_Link">
+    <inertial>
+      <origin
+        xyz="-2.076849086316E-05 0.069775111195073 0.0357011547516871"
+        rpy="0 0 0" />
+      <mass
+        value="0.50210042022368" />
+      <inertia
+        ixx="0.000489557288388684"
+        ixy="5.6104318887096E-08"
+        ixz="5.45210084359973E-08"
+        iyy="0.000341180748707049"
+        iyz="-5.00263310392927E-06"
+        izz="0.000475078089233413" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/waist_pitch_Link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/waist_pitch_Link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="waist_pitch_joint"
+    type="revolute">
+    <origin
+      xyz="0.000465738761444068 -0.0594840214638825 0.086"
+      rpy="0 0 0" />
+    <parent
+      link="up_down2_Link" />
+    <child
+      link="waist_pitch_Link" />
+    <axis
+      xyz="0 1 0" />
+    <limit
+      lower="-1.57"
+      upper="1.57"
+      effort="0"
+      velocity="0" />
+  </joint>
+  <link
+    name="waist_yaw_Link">
+    <inertial>
+      <origin
+        xyz="-0.00460814462930326 -1.15863620856627E-05 0.207868027334335"
+        rpy="0 0 0" />
+      <mass
+        value="6.44407427357773" />
+      <inertia
+        ixx="0.0673594366071788"
+        ixy="-2.64723047629879E-07"
+        ixz="1.76151545792602E-05"
+        iyy="0.0492576324925324"
+        iyz="2.50606959140893E-06"
+        izz="0.0247061009926636" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/waist_yaw_Link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.501960784313725 0.501960784313725 0.501960784313725 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/waist_yaw_Link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="waist_yaw_joint"
+    type="revolute">
+    <origin
+      xyz="0 0.0650000000000004 0.0854999999999999"
+      rpy="0 0 0" />
+    <parent
+      link="waist_pitch_Link" />
+    <child
+      link="waist_yaw_Link" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="-1.57"
+      upper="1.57"
+      effort="0"
+      velocity="0" />
+  </joint>
+  <link
+    name="head_yaw_Link">
+    <inertial>
+      <origin
+        xyz="1.02787311329067E-06 0.00140551985966859 0.0603369019942002"
+        rpy="0 0 0" />
+      <mass
+        value="0.346584679219197" />
+      <inertia
+        ixx="0.00126186405116387"
+        ixy="1.13185525769501E-05"
+        ixz="1.14129359799192E-06"
+        iyy="0.000614330813640592"
+        iyz="-3.87575975816205E-05"
+        izz="0.000709287946824238" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/head_yaw_Link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/head_yaw_Link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="head_yaw_joint"
+    type="revolute">
+    <origin
+      xyz="0 0 0.441000000000001"
+      rpy="0 0 0" />
+    <parent
+      link="waist_yaw_Link" />
+    <child
+      link="head_yaw_Link" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="-1.57"
+      upper="1.57"
+      effort="0"
+      velocity="0" />
+  </joint>
+  <link
+    name="head_pitch_Link">
+    <inertial>
+      <origin
+        xyz="0.0230453321118721 0.0382484692952901 -0.0267784460850895"
+        rpy="0 0 0" />
+      <mass
+        value="1.73339200412619" />
+      <inertia
+        ixx="0.00100288317059999"
+        ixy="1.43257116712419E-05"
+        ixz="1.08677566631155E-05"
+        iyy="0.000308941526994876"
+        iyz="-1.73345167411413E-06"
+        izz="0.000972428823413375" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/head_pitch_Link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/head_pitch_Link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="head_pitch_joint"
+    type="revolute">
+    <origin
+      xyz="0.000628287142177303 -0.0359945176189371 0.14"
+      rpy="0 0 0.0174532925199317" />
+    <parent
+      link="head_yaw_Link" />
+    <child
+      link="head_pitch_Link" />
+    <axis
+      xyz="0 1 0" />
+    <limit
+      lower="-1.57"
+      upper="1.57"
+      effort="0"
+      velocity="0" />
+  </joint>
+  <link
+    name="left_shoulder_pitch_Link">
+    <inertial>
+      <origin
+        xyz="0.00318389318681078 0.0389106497519716 -3.20769629591489E-05"
+        rpy="0 0 0" />
+      <mass
+        value="0.41888868152878" />
+      <inertia
+        ixx="0.000513076406809589"
+        ixy="2.10121077630187E-05"
+        ixz="-3.60856643166192E-08"
+        iyy="0.00037574060488547"
+        iyz="-1.79725581742236E-07"
+        izz="0.000455523508313046" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/left_shoulder_pitch_Link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/left_shoulder_pitch_Link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="left_shoulder_pitch_joint"
+    type="revolute">
+    <origin
+      xyz="0 0.144500000000002 0.337999999999999"
+      rpy="0 0 0" />
+    <parent
+      link="waist_yaw_Link" />
+    <child
+      link="left_shoulder_pitch_Link" />
+    <axis
+      xyz="0 1 0" />
+    <limit
+      lower="-1.57"
+      upper="1.57"
+      effort="0"
+      velocity="0" />
+  </joint>
+  <link
+    name="left_shoulder_roll_Link">
+    <inertial>
+      <origin
+        xyz="0.0383696991059809 -0.0007247003803737 -0.0413793209943842"
+        rpy="0 0 0" />
+      <mass
+        value="0.465376556478972" />
+      <inertia
+        ixx="0.000826777865471809"
+        ixy="-2.06330636598535E-09"
+        ixz="2.34481860386766E-06"
+        iyy="0.00070813335485068"
+        iyz="-7.41744140991867E-06"
+        izz="0.000283429090466724" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/left_shoulder_roll_Link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/left_shoulder_roll_Link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="left_shoulder_roll_joint"
+    type="revolute">
+    <origin
+      xyz="-0.0400000000000001 0.0529999999999999 0"
+      rpy="0 0 0" />
+    <parent
+      link="left_shoulder_pitch_Link" />
+    <child
+      link="left_shoulder_roll_Link" />
+    <axis
+      xyz="1 0 0" />
+    <limit
+      lower="0"
+      upper="3.14"
+      effort="0"
+      velocity="0" />
+  </joint>
+  <link
+    name="left_big_arm_yaw_Link">
+    <inertial>
+      <origin
+        xyz="-0.00506720901708799 0.00100002163340979 -0.0855158125448829"
+        rpy="0 0 0" />
+      <mass
+        value="0.302193102743044" />
+      <inertia
+        ixx="0.000722328776693696"
+        ixy="-1.28176703129464E-06"
+        ixz="-3.68199423904788E-05"
+        iyy="0.000635262017044485"
+        iyz="2.29543180365427E-06"
+        izz="0.000261082224982027" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/left_big_arm_yaw_Link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/left_big_arm_yaw_Link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="left_shoulder_yaw_joint"
+    type="revolute">
+    <origin
+      xyz="0.0400000000000236 -0.00191976470810262 -0.109983246467199"
+      rpy="-0.0174532925199569 0 0" />
+    <parent
+      link="left_shoulder_roll_Link" />
+    <child
+      link="left_big_arm_yaw_Link" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="-1.57"
+      upper="1.57"
+      effort="0"
+      velocity="0" />
+  </joint>
+  <link
+    name="left_elbow_pitch_Link">
+    <inertial>
+      <origin
+        xyz="-0.000167312149983334 -0.0419842857859548 -0.0616339558607708"
+        rpy="0 0 0" />
+      <mass
+        value="0.262242698119733" />
+      <inertia
+        ixx="0.000500567198964274"
+        ixy="-3.64766687534904E-08"
+        ixz="4.20678790030092E-07"
+        iyy="0.00047712009720406"
+        iyz="-5.61825810571682E-05"
+        izz="0.000139273040796457" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/left_elbow_pitch_Link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/left_elbow_pitch_Link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="left_elbow_pitch_joint"
+    type="revolute">
+    <origin
+      xyz="0.00073300107039731 0.0419936031965677 -0.138"
+      rpy="0 0 -0.0174532925208338" />
+    <parent
+      link="left_big_arm_yaw_Link" />
+    <child
+      link="left_elbow_pitch_Link" />
+    <axis
+      xyz="0 1 0" />
+    <limit
+      lower="-2.09"
+      upper="0"
+      effort="0"
+      velocity="0" />
+  </joint>
+  <link
+    name="left_small_arm_yaw_Link">
+    <inertial>
+      <origin
+        xyz="0.000739385558247208 0.022046312881648 -0.0436503913080669"
+        rpy="0 0 0" />
+      <mass
+        value="0.401501369999461" />
+      <inertia
+        ixx="0.000325066176217133"
+        ixy="1.31003004843897E-06"
+        ixz="-1.05646049809955E-06"
+        iyy="0.000360552310923368"
+        iyz="-3.05512007085324E-05"
+        izz="0.000142350245107731" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/left_small_arm_yaw_Link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/left_small_arm_yaw_Link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="left_elbow_yaw_joint"
+    type="revolute">
+    <origin
+      xyz="0 -0.0419874828005631 -0.159"
+      rpy="0 0 0.0174532925208338" />
+    <parent
+      link="left_elbow_pitch_Link" />
+    <child
+      link="left_small_arm_yaw_Link" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="-1.57"
+      upper="1.57"
+      effort="0"
+      velocity="0" />
+  </joint>
+  <link
+    name="left_wrist_pitch__Link">
+    <inertial>
+      <origin
+        xyz="0.005246491297212 -0.0286361213426559 0.00109993684035858"
+        rpy="0 0 0" />
+      <mass
+        value="0.106027345822065" />
+      <inertia
+        ixx="5.66274313814847E-05"
+        ixy="2.31002715704341E-06"
+        ixz="-1.88802743795875E-06"
+        iyy="5.98531745410257E-05"
+        iyz="5.78041305548603E-07"
+        izz="7.64456062317E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/left_wrist_pitch__Link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/left_wrist_pitch__Link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="left_wrist_pitch_joint"
+    type="revolute">
+    <origin
+      xyz="0.00114274139085022 0.0329676104326902 -0.0904999999999921"
+      rpy="0 0 -0.034906585041492" />
+    <parent
+      link="left_small_arm_yaw_Link" />
+    <child
+      link="left_wrist_pitch__Link" />
+    <axis
+      xyz="0 1 0" />
+    <limit
+      lower="-0.61"
+      upper="0.61"
+      effort="0"
+      velocity="0" />
+  </joint>
+  <link
+    name="left_wrist_roll_Link">
+    <inertial>
+      <origin
+        xyz="0.0696987223483703 0.000508725696223955 -0.0451055299835025"
+        rpy="0 0 0" />
+      <mass
+        value="0.129367727411018" />
+      <inertia
+        ixx="5.66669694929959E-05"
+        ixy="2.64012999925975E-08"
+        ixz="-2.37769413485426E-06"
+        iyy="7.39410227041722E-05"
+        iyz="3.24993033435291E-07"
+        izz="4.28353764336253E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/left_wrist_roll_Link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/left_wrist_roll_Link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="left_wrist_roll_joint"
+    type="revolute">
+    <origin
+      xyz="-0.031246 -0.032493 -0.00051615"
+      rpy="0.018071 -0.017453 0" />
+    <parent
+      link="left_wrist_pitch__Link" />
+    <child
+      link="left_wrist_roll_Link" />
+    <axis
+      xyz="1 0 0" />
+    <limit
+      lower="-0.79"
+      upper="0.35"
+      effort="0"
+      velocity="0" />
+  </joint>
+  <link
+    name="right_shoulder_pitch_Link">
+    <inertial>
+      <origin
+        xyz="0.00287575882013208 -0.0387929743957068 5.25725569804347E-05"
+        rpy="0 0 0" />
+      <mass
+        value="0.414995453473995" />
+      <inertia
+        ixx="0.000513054121601453"
+        ixy="-2.10091296417217E-05"
+        ixz="9.63606972749073E-07"
+        iyy="0.000375750521752242"
+        iyz="-1.90959660985158E-07"
+        izz="0.000455492982083133" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/right_shoulder_pitch_Link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/right_shoulder_pitch_Link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="right_shoulder_pitch_joint"
+    type="revolute">
+    <origin
+      xyz="0 -0.144499999999997 0.338000000000011"
+      rpy="0 0 0" />
+    <parent
+      link="waist_yaw_Link" />
+    <child
+      link="right_shoulder_pitch_Link" />
+    <axis
+      xyz="0 1 0" />
+    <limit
+      lower="-1.57"
+      upper="1.57"
+      effort="0"
+      velocity="0" />
+  </joint>
+  <link
+    name="right_shoulder_roll_Link">
+    <inertial>
+      <origin
+        xyz="0.0393255589973714 3.61151018889727E-05 -0.0570510344281707"
+        rpy="0 0 0" />
+      <mass
+        value="0.765497472725795" />
+      <inertia
+        ixx="0.000980547391950623"
+        ixy="2.63911941016732E-07"
+        ixz="-2.70066989690511E-06"
+        iyy="0.000863147749796434"
+        iyz="-3.80039312894052E-07"
+        izz="0.000424271790398628" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/right_shoulder_roll_Link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/right_shoulder_roll_Link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="right_shoulder_roll_joint"
+    type="revolute">
+    <origin
+      xyz="-0.0399939078062556 -0.053 -0.000698096257493175"
+      rpy="0 -0.0174532925199917 0" />
+    <parent
+      link="right_shoulder_pitch_Link" />
+    <child
+      link="right_shoulder_roll_Link" />
+    <axis
+      xyz="1 0 0" />
+    <limit
+      lower="-3.14"
+      upper="0"
+      effort="0"
+      velocity="0" />
+  </joint>
+  <link
+    name="right_big_arm_yaw_Link">
+    <inertial>
+      <origin
+        xyz="-0.00508338077854645 -0.000912115459632323 -0.0855146974554564"
+        rpy="0 0 0" />
+      <mass
+        value="0.302197696480226" />
+      <inertia
+        ixx="0.000722354410332105"
+        ixy="-2.40623347456398E-07"
+        ixz="-3.68570620775049E-05"
+        iyy="0.000635250144057479"
+        iyz="-1.65221811953965E-06"
+        izz="0.000261089850693375" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/right_big_arm_yaw_Link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/right_big_arm_yaw_Link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="right_shoulder_yaw_joint"
+    type="revolute">
+    <origin
+      xyz="0.04 0 -0.109999999999996"
+      rpy="0 0 0" />
+    <parent
+      link="right_shoulder_roll_Link" />
+    <child
+      link="right_big_arm_yaw_Link" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="-1.57"
+      upper="1.57"
+      effort="0"
+      velocity="0" />
+  </joint>
+  <link
+    name="right_elbow_pitch_Link">
+    <inertial>
+      <origin
+        xyz="-0.00103252007780466 0.0407829154090397 -0.0516332576106449"
+        rpy="0 0 0" />
+      <mass
+        value="0.750561339886946" />
+      <inertia
+        ixx="0.000726293179532323"
+        ixy="5.8959177382106E-07"
+        ixz="-6.48623178268863E-06"
+        iyy="0.000689282614702447"
+        iyz="5.10553340201112E-05"
+        izz="0.000346601085187189" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/right_elbow_pitch_Link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.647058823529412 0.619607843137255 0.588235294117647 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/right_elbow_pitch_Link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="right_elbow_pitch_joint"
+    type="revolute">
+    <origin
+      xyz="0 -0.042 -0.138"
+      rpy="0 0.0174532925199917 0" />
+    <parent
+      link="right_big_arm_yaw_Link" />
+    <child
+      link="right_elbow_pitch_Link" />
+    <axis
+      xyz="0 1 0" />
+    <limit
+      lower="-2.09"
+      upper="0"
+      effort="0"
+      velocity="0" />
+  </joint>
+  <link
+    name="right_small_arm_yaw_Link">
+    <inertial>
+      <origin
+        xyz="-0.000420509628199728 -0.0159237773535412 -0.0394395916103865"
+        rpy="0 0 0" />
+      <mass
+        value="0.589723741579753" />
+      <inertia
+        ixx="0.000396016873203238"
+        ixy="-2.41314400791719E-07"
+        ixz="5.35089842859487E-07"
+        iyy="0.000414063007745285"
+        iyz="3.05848503997597E-05"
+        izz="0.000213549621452879" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/right_small_arm_yaw_Link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/right_small_arm_yaw_Link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="right_elbow_yaw_joint"
+    type="revolute">
+    <origin
+      xyz="-0.00277493262351872 0.042487482800563 -0.158975783529866"
+      rpy="0 0.0174532925198844 0" />
+    <parent
+      link="right_elbow_pitch_Link" />
+    <child
+      link="right_small_arm_yaw_Link" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="-1.57"
+      upper="1.57"
+      effort="0"
+      velocity="0" />
+  </joint>
+  <link
+    name="right_wrist_pitch_Link">
+    <inertial>
+      <origin
+        xyz="0.0039009196069294 0.0308423930236985 0.000254562211837839"
+        rpy="0 0 0" />
+      <mass
+        value="0.294250671393128" />
+      <inertia
+        ixx="0.000109953286314705"
+        ixy="-1.85213397745051E-06"
+        ixz="-2.42401863458367E-07"
+        iyy="0.000130866961469907"
+        iyz="-5.08185028267958E-07"
+        izz="0.000147767794172561" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/right_wrist_pitch_Link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/right_wrist_pitch_Link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="right_wrist_pitch_joint"
+    type="revolute">
+    <origin
+      xyz="-0.00056720320921122 -0.0329825328931523 -0.0904999999999921"
+      rpy="0 -0.0174559506057941 -0.0174532925199297" />
+    <parent
+      link="right_small_arm_yaw_Link" />
+    <child
+      link="right_wrist_pitch_Link" />
+    <axis
+      xyz="0 1 0" />
+    <limit
+      lower="-0.61"
+      upper="0.61"
+      effort="0"
+      velocity="0" />
+  </joint>
+  <link
+    name="right_wrist_roll__Link">
+    <inertial>
+      <origin
+        xyz="0.0829369693345453 -0.00391805904186091 -0.073969856133083"
+        rpy="0 0 0" />
+      <mass
+        value="1.16859581781848" />
+      <inertia
+        ixx="0.000247261382393728"
+        ixy="-1.49889437251489E-07"
+        ixz="-2.66078186369788E-06"
+        iyy="0.000264425320040453"
+        iyz="4.01357989589835E-06"
+        izz="0.000333199773489662" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/right_wrist_roll__Link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://shuangbi_robot/meshes/right_wrist_roll__Link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="right_wrist_roll_joint"
+    type="revolute">
+    <origin
+      xyz="-0.03123 0.032493 0.0011199"
+      rpy="-0.00030463 0.034909 0" />
+    <parent
+      link="right_wrist_pitch_Link" />
+    <child
+      link="right_wrist_roll__Link" />
+    <axis
+      xyz="1 0 0" />
+    <limit
+      lower="-0.35"
+      upper="0.79"
+      effort="0"
+      velocity="0" />
+  </joint>
+</robot>

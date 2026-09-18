@@ -1,0 +1,11 @@
+<!-- Reference snippet only; not deployed.
+     RGB optical frame: X right, Y down, Z forward.
+     Uses original measured q_ours without extra joint-zero corrections.
+     Status: PASSED_HELDOUT_ORIGIN_RMS_5MM; this is not an all-points <=5mm guarantee.
+     Do not paste this optical transform into a physical camera_link joint. -->
+<link name="calibrated_rgb_optical_frame"/>
+<joint name="calibrated_rgb_optical_joint" type="fixed">
+  <parent link="head_pitch_Link"/>
+  <child link="calibrated_rgb_optical_frame"/>
+  <origin xyz="0.048286583744 0.071546448836 -0.027748197981" rpy="-1.538890466603 0.000006086340 -1.561077526585"/>
+</joint>

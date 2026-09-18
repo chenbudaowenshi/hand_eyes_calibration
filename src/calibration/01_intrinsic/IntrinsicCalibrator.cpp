@@ -1,4 +1,5 @@
 #include "calibration/01_intrinsic/IntrinsicCalibrator.h"
+#include <algorithm>
 #include <iostream>
 
 int IntrinsicCalibrator::detectCalibBoard(const cv::Mat &input_image,
@@ -28,11 +29,29 @@ int IntrinsicCalibrator::detectCalibBoard(const cv::Mat &input_image,
     found = cv::findChessboardCorners(
         gray, cv::Size(cfg.cols, cfg.rows), all_pixel_corners,
         cv::CALIB_CB_ADAPTIVE_THRESH | cv::CALIB_CB_NORMALIZE_IMAGE);
-    if (found)
+    if (found) {
       cv::cornerSubPix(
           gray, all_pixel_corners, cv::Size(11, 11), cv::Size(-1, -1),
           cv::TermCriteria(cv::TermCriteria::EPS + cv::TermCriteria::COUNT, 30,
                            0.001));
+    } else {
+      // The classic detector needs a large, sharp checkerboard; it misses
+      // most frames once the board only spans a small part of the image
+      // (camera far from a small board). findChessboardCornersSB is a
+      // newer, far more robust detector for exactly that case -- verified
+      // on a real dataset where the classic detector found 4/100 frames
+      // and this fallback found 86/100 of the SAME frames. Its corner
+      // order is consistently the reverse of the classic detector's for
+      // this board (confirmed against the 4 frames both detect, <2px
+      // agreement after reversing), so flip it back before use --
+      // otherwise every corner pairs with the wrong world point and PnP
+      // silently returns a garbage pose instead of failing loudly.
+      found = cv::findChessboardCornersSB(
+          gray, cv::Size(cfg.cols, cfg.rows), all_pixel_corners,
+          cv::CALIB_CB_EXHAUSTIVE | cv::CALIB_CB_ACCURACY);
+      if (found)
+        std::reverse(all_pixel_corners.begin(), all_pixel_corners.end());
+    }
   } else if (cfg.pattern == CIRCLES_SYM) {
     found = cv::findCirclesGrid(gray, cv::Size(cfg.cols, cfg.rows),
                                 all_pixel_corners, cv::CALIB_CB_SYMMETRIC_GRID);
@@ -92,7 +111,10 @@ int IntrinsicCalibrator::detectCalibBoard(const cv::Mat &input_image,
     }
   }
 
-  if (calib_type == 0) {
+  if (calib_type == 0 && cfg.pattern != CHESSBOARD) {
+    // The sparse subset is only useful for the asymmetric-circle marker
+    // layout.  A chessboard must retain every detected corner; the previous
+    // hard-coded modulo-4 filter silently discarded rows for 12x9 boards.
     for (size_t i = 0; i < all_pixel_corners.size(); ++i) {
       auto last_num = i % 4;
       auto div_num = (i - last_num) / 4;
@@ -101,7 +123,7 @@ int IntrinsicCalibrator::detectCalibBoard(const cv::Mat &input_image,
         world_corners.push_back(all_world_corners[i]);
       }
     }
-  } else if (calib_type == 1) {
+  } else if (calib_type == 1 || cfg.pattern == CHESSBOARD) {
     pixel_corners = all_pixel_corners;
     world_corners = all_world_corners;
   } else {
@@ -113,6 +135,26 @@ int IntrinsicCalibrator::detectCalibBoard(const cv::Mat &input_image,
 
 bool IntrinsicCalibrator::intrinsicCalibrate(const CalibConfig &cfg,
                                           const std::vector<std::string> imgs) {
+  // Re-deriving intrinsics via cv::calibrateCamera needs the BOARD tilted at
+  // many different angles relative to the camera. A hand-eye dataset is the
+  // opposite: the camera moves around a board that stays close to
+  // fronto-parallel in frame (that's what makes it good hand-eye data), so
+  // fitting intrinsics from it is poorly conditioned -- it can silently
+  // produce a low-single-digit-pixel-looking RMS that's actually garbage
+  // (asymmetric fx/fy, wild distortion). When the caller supplies real
+  // device-reported intrinsics (cfg.use_fixed_intrinsics), skip the fit
+  // entirely and trust those instead.
+  if (cfg.use_fixed_intrinsics && !cfg.fixed_K.empty()) {
+    std::cout << "使用外部提供的内参，跳过第一次内参拟合。\n";
+    std::cout << "内参: \n" << cfg.fixed_K << "\n";
+    std::cout << "畸变: \n" << cfg.fixed_dist << "\n";
+    cv::FileStorage fs(cfg.xml_intrinsic_1st, cv::FileStorage::WRITE);
+    fs << "K" << cfg.fixed_K << "distortion" << cfg.fixed_dist << "pattern"
+       << (int)cfg.pattern;
+    fs.release();
+    return true;
+  }
+
   std::vector<std::vector<cv::Point3f>> worlds_list_first;
   std::vector<std::vector<cv::Point2f>> pixels_list_first;
   cv::Size imgSize;

@@ -1,7 +1,9 @@
 cmake_minimum_required(VERSION 3.10)
 project(Pose6D)
 
-set(CMAKE_CXX_STANDARD 11)
+# 17 is required by the ROS2 (rclcpp/tf2_ros) headers pulled in by capture.cpp;
+# it is a strict superset of 11 for every other translation unit here.
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(THIRDPARTY_DIR "${CMAKE_SOURCE_DIR}/3rdparty")
@@ -32,6 +34,28 @@ if (NOT REALSENSE2_LIBRARY OR NOT REALSENSE2_INCLUDE_DIR)
     message(FATAL_ERROR "librealsense2 not found. Please install librealsense2 v2.54.2 in ${THIRDPARTY_DIR}/camera_realsense.")
 endif()
 
+# capture.cpp (RealSense + ROS2 TF data capture tool, meant to run on the
+# robot's onboard computer) is the only thing that needs ROS2. calib/detect
+# are pure OpenCV/Eigen offline tools and must keep building fine on a
+# machine with no ROS2 install at all (e.g. your local calibration-solving
+# machine). So: look for ROS2, but don't require it -- just skip the
+# `capture` target if it's not there. Source ROS2 before running cmake
+# (e.g. `source /opt/ros/humble/setup.bash`) to have it picked up.
+find_package(ament_cmake QUIET)
+find_package(rclcpp QUIET)
+find_package(tf2 QUIET)
+find_package(tf2_ros QUIET)
+find_package(geometry_msgs QUIET)
+set(HAND_EYE_BUILD_CAPTURE FALSE)
+if (ament_cmake_FOUND AND rclcpp_FOUND AND tf2_FOUND AND tf2_ros_FOUND AND geometry_msgs_FOUND)
+    set(HAND_EYE_BUILD_CAPTURE TRUE)
+else()
+    message(STATUS "ROS2 (rclcpp/tf2_ros/geometry_msgs) not found -- skipping the "
+                    "`capture` target. This is expected on a machine that only "
+                    "runs `calib`/`detect`; source your ROS2 install if you did "
+                    "mean to build `capture` here.")
+endif()
+
 include_directories(
         ${CMAKE_SOURCE_DIR}
         ${CMAKE_SOURCE_DIR}/include
@@ -60,3 +84,9 @@ target_link_libraries(calib common ${OpenCV_LIBS} ${REALSENSE2_LIBRARY})
 
 add_executable(detect detect.cpp)
 target_link_libraries(detect common ${OpenCV_LIBS} ${REALSENSE2_LIBRARY})
+
+if (HAND_EYE_BUILD_CAPTURE)
+    add_executable(capture capture.cpp)
+    target_link_libraries(capture common ${OpenCV_LIBS} ${REALSENSE2_LIBRARY})
+    ament_target_dependencies(capture rclcpp tf2 tf2_ros geometry_msgs)
+endif()

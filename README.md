@@ -72,6 +72,74 @@
 
 ## 环境搭建与运行
 
+### 真实 D435i 头部相机标定（12×9 方格，15 mm）
+
+本项目实际使用的棋盘格是 **12 个方格横向、9 个方格纵向、每格 15 mm**。
+OpenCV 检测的是内角点，因此程序配置为 `11×8`：
+
+```cpp
+cfg.pattern = CHESSBOARD;
+cfg.cols = 11;
+cfg.rows = 8;
+cfg.interval_mm = 15;
+cfg.calib_type = CalibrationType3D::EIH;
+```
+
+先在已 source ROS 2 Humble 的终端启动机器人 TF，然后采集数据：
+
+```bash
+cd /home/robot/hand_eyes_calibration
+cmake -S . -B build
+cmake --build build --target capture -j2
+source /opt/ros/humble/setup.bash
+./build/capture --dataset ./dataset \
+  --base-frame waist_yaw_Link \
+  --gripper-frame head_pitch_Link \
+  --width 1920 --height 1080 --fps 30 --gui
+```
+
+`--base-frame` 默认是 `waist_yaw_Link`（不是 `base_link`）：查过实机 URDF（`/home/robot/shuangbi/urdf/shuangbi20260803.urdf`），`base_link` 到 `head_pitch_Link` 中间有 6 个可动关节（升降柱 ×2、腰 pitch/yaw、头 yaw/pitch），全部都要有实时准确的关节状态 TF 才可信；而 `waist_yaw_Link` 到 `head_pitch_Link` 中间只隔 `head_yaw_joint`/`head_pitch_joint` 这两个关节——正好是标定时本来就要摆动、用来保证旋转多样性的关节。采集全程只要把升降柱和腰部物理锁死不动即可，不需要整条全身运动学链都在发布。等整机关节状态都能稳定发布之后，也可以改用 `--base-frame base_link` 获得更大的姿态覆盖范围。
+
+采集程序只保存检测到完整棋盘格且能在图像采集时间查询到 TF 的样本。GUI 中按空格保存，按 `q` 退出；无图形界面时使用 `--headless`，每次按 Enter 保存。输出包括：
+
+```text
+dataset/rgb/frame_XXXX.png
+dataset/poses.csv
+dataset/realsense_intrinsics.xml
+```
+
+`poses.csv` 的每行是：
+
+```text
+image_name,capture_stamp_s,x_mm,y_mm,z_mm,rx_deg,ry_deg,rz_deg
+```
+
+其中位姿为 `T_<--base-frame>_head_pitch_Link`（默认 `T_waist_yaw_Link_head_pitch_Link`），角度是 ROS/tf2 的外旋 XYZ，时间戳是主机系统 Unix 时间。
+
+采集至少 15～25 组姿态，最后 2～5 组作为独立验证样本。采集完成后运行：
+
+```bash
+./build/calib --dataset ./dataset --output ./calibration_output \
+  --validate-count 3 --child-frame head_d435i_optical_frame
+```
+
+输出文件：
+
+```text
+calibration_output/calib_intrinsic_1st.xml
+calibration_output/calib_intrinsic_2nd.xml
+calibration_output/calib_extrinsic.xml
+calibration_output/head_d435i_optical.urdf.xml
+```
+
+`calib_extrinsic.xml` 中的矩阵语义为：
+
+```text
+p_head_pitch_Link = R * p_camera_optical + t
+```
+
+平移保存为毫米；`head_d435i_optical.urdf.xml` 中已转换为米，可作为 URDF `<origin xyz=... rpy=.../>` 的参考。程序还会输出训练集和留出样本的 RMS、平均误差、最大误差以及每个样本误差。
+
 ### 1. 依赖项
 项目通过提供的脚本自动化管理依赖, 编译后会安装在 `3rdparty/` 目录下: 
 - **OpenCV 4.x**: 用于图像处理、角点检测及 ArUco 识别, 运行 `bash build_opencv.sh` 即可. 
@@ -87,6 +155,27 @@ cmake .. && make -j8
 ./detect mode="camera" xml="./calib_extrinsic.xml"  # 实时检测 (xml="calib_extrinsic.xml" mode="camera")
 #./detect image="**.png" xml="./calib_extrinsic.xml"  # 离线检测 (xml="calib_extrinsic.xml" image="**.png")
 ```
+
+---
+
+## 头部相机手眼数据采集 (`capture.cpp`)
+
+`capture` 是专为头部 RealSense 相机 EIH（Eye-In-Hand）标定设计的数据采集工具, 直接从 RealSense SDK 读取真实内参并通过 ROS2 TF 获取 `head_pitch_Link` 位姿, 二者在同一次按键触发下配对采集. 编译前需先 `source /opt/ros/humble/setup.bash`（或对应发行版）, 使 `find_package(rclcpp/tf2_ros/...)` 能定位到 ROS2 安装.
+
+```bash
+./capture --dataset ../dataset --base-frame waist_yaw_Link
+# 预览窗口: 按 SPACE/s 采集一帧 (图像 + 同时刻 head_pitch_Link 位姿), 按 q/ESC 结束
+```
+
+*   `--base-frame`（默认 `waist_yaw_Link`）：必须是整个采集过程中相对标定板保持静止的 TF 坐标系. `waist_yaw_Link` 到 `head_pitch_Link` 中间只有 `head_yaw_joint`/`head_pitch_joint` 两个关节, 只要采集时把升降柱和腰部锁死不动就满足假设, 不依赖整机关节状态发布. 若全身 `/joint_states` 能稳定发布, 也可以改用 `base_link` 换取更大的姿态覆盖范围（但 `base_link` 到 `head_pitch_Link` 中间有 6 个可动关节, 全部需要准确的实时状态）. 若固定坐标系相对标定板不是真正静止, 标定结果将系统性偏移.
+*   输出内容：
+    *   `dataset/rgb/frame_%04d.png`：采集到的彩色图像.
+    *   `dataset/poses.csv`：每帧对应的 `T_<--base-frame>_head_pitch_Link`（平移 mm、RPY 为外旋 X-Y-Z / ROS 固定轴约定, 单位度）以及采集时间戳（秒, RealSense 设备时钟域）.
+
+    *   `dataset/realsense_intrinsics.xml`：RealSense **实时**上报的彩色内参 K、畸变系数、深度尺度 (depth_scale, 米/LSB)、分辨率与帧率, 与 `calib` 基于棋盘格二次标定得到的 `calib_intrinsic_1st/2nd.xml` 分开存档, 便于比对出厂值与二次标定结果的差异.
+*   工具支持断点续采：重新运行时会从已有的 `rgb/frame_*.png` 数量续编号, `poses.csv` 以追加方式写入.
+
+采集完成后, 用 `calib --dataset ../dataset --output ../calibration_output` 完成标定（见下方 “标定结果示例” 一节, 已针对头部相机场景固定为 12x9/15mm 棋盘格 + EIH 配置）. `calib` 会自动把最后 `--validate-count`（默认 1）个采集样本排除在内参二次标定与手眼求解之外, 仅用于对求得矩阵做独立验证.
 
 ---
 
@@ -213,9 +302,10 @@ center=(1317.1327, 539.6984), R=(103.3818)
 207.7205, -332.6460, -424.7441, 177.2844, 1.1158, 101.0728
 ```
 *   **含义解析**：
-    *   **RMS**：PnP 解算的重投影均方根误差. 越小表示图像特征识别越准. 
-    *   **Avg Error**：手眼矩阵闭环后的物理平均误差（mm）. **0.13mm** 表示精度极佳. 
-    *   **hand_eyes**：眼在手上-相机坐标系到机器人末端坐标系的转换关系, 眼在手外-相机坐标系到机器人基坐标系的转换关系. 
+    *   **RMS（PnP）**：标定板检测/PnP 解算的重投影均方根误差（像素）. 越小表示图像特征识别越准. 
+    *   **RMS/Avg/Max（手眼）**：手眼矩阵闭环后的物理误差统计（mm）, 基于**参与求解**的样本. RMS = sqrt(mean(error²)), 与逐点 Error 列一致口径. 
+    *   **Category 2b 独立验证**：默认最后 1 个采集样本不参与内参二次标定与手眼求解, 单独用其图像 + 机器人位姿反算标定板原点在 `capture --base-frame` 坐标系下的位置, 与训练集估计出的固定点比较得到的 RMS/Avg/Max, 是对标定矩阵的真正样本外检验. 
+    *   **hand_eyes / T_head_pitch_Link_camera_optical**：满足 `p_head_pitch_Link = R * p_camera_optical + t`, 即把相机光学系中的点映射到 `head_pitch_Link` 系（头部相机 EIH 场景）；通用地, 眼在手上时为相机系到机器人末端坐标系的转换关系, 眼在手外时为相机系到机器人基坐标系的转换关系. 
 
 ### 5. 3D 基于标定球 (Ball-based - 处理无纹理或大场景)
 前提是获取到球心 XYZ . 

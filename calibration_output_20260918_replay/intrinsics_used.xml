@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<opencv_storage>
+<K type_id="opencv-matrix">
+  <rows>3</rows>
+  <cols>3</cols>
+  <dt>d</dt>
+  <data>
+    9.1095959472656250e+02 0. 6.3672717285156250e+02 0.
+    9.0849786376953125e+02 3.8010150146484375e+02 0. 0. 1.</data></K>
+<distortion type_id="opencv-matrix">
+  <rows>1</rows>
+  <cols>5</cols>
+  <dt>d</dt>
+  <data>
+    0. 0. 0. 0. 0.</data></distortion>
+<width>1280</width>
+<height>720</height>
+<distortion_model>plumb_bob</distortion_model>
+<source>"capture manifest; SDK provenance not independently verified"</source>
+</opencv_storage>
